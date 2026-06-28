@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบลงเวลา</title>
+  <script src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #06c755 0%, #00a040 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 24px;
+      padding: 32px 24px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    }
+    .logo { text-align: center; margin-bottom: 24px; }
+    .logo-icon { font-size: 48px; display: block; margin-bottom: 8px; }
+    .logo h1 { font-size: 22px; font-weight: 700; color: #1a1a1a; }
+    .logo p { font-size: 13px; color: #888; margin-top: 4px; }
+    .profile-box {
+      display: flex; align-items: center; gap: 12px;
+      background: #f8f9fa; border-radius: 16px;
+      padding: 14px 16px; margin-bottom: 24px;
+    }
+    .profile-box img {
+      width: 48px; height: 48px; border-radius: 50%;
+      object-fit: cover; border: 2px solid #06c755;
+    }
+    .profile-info .name { font-weight: 600; font-size: 15px; color: #1a1a1a; }
+    .profile-info .status { font-size: 12px; color: #06c755; margin-top: 2px; }
+    .time-box {
+      text-align: center;
+      background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+      border-radius: 16px; padding: 20px; margin-bottom: 24px;
+      border: 1px solid #bbf7d0;
+    }
+    .time-box .time { font-size: 36px; font-weight: 700; color: #06c755; letter-spacing: 2px; }
+    .time-box .date { font-size: 14px; color: #555; margin-top: 4px; }
+    .btn {
+      width: 100%; padding: 16px; border: none; border-radius: 16px;
+      font-size: 17px; font-weight: 700; cursor: pointer;
+      transition: all 0.2s; margin-bottom: 12px;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-checkin {
+      background: linear-gradient(135deg, #06c755, #00a040);
+      color: white; box-shadow: 0 4px 20px rgba(6,199,85,0.35);
+    }
+    .btn-checkout {
+      background: linear-gradient(135deg, #ff4757, #cc0000);
+      color: white; box-shadow: 0 4px 20px rgba(255,71,87,0.35);
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .status-box {
+      display: none; text-align: center; padding: 14px;
+      border-radius: 12px; font-size: 14px; font-weight: 600; margin-top: 8px;
+    }
+    .status-box.success {
+      background: #f0fdf4; color: #16a34a;
+      border: 1px solid #bbf7d0; display: block;
+    }
+    .status-box.error {
+      background: #fff1f2; color: #dc2626;
+      border: 1px solid #fecdd3; display: block;
+    }
+    .loading { text-align: center; color: #555; font-size: 14px; padding: 20px; }
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid #e5e7eb; border-top-color: #06c755;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+      margin: 0 auto 12px;
+    }
+    .debug {
+      font-size: 11px; color: #999; margin-top: 8px;
+      background: #f5f5f5; padding: 8px; border-radius: 8px;
+      word-break: break-all;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <span class="logo-icon">🏢</span>
+    <h1>ระบบลงเวลา</h1>
+    <p>HR Attendance System</p>
+  </div>
+  <div id="loading" class="loading">
+    <div class="spinner"></div>
+    <div id="loadingText">กำลังเริ่มต้น...</div>
+    <div class="debug" id="debugText"></div>
+  </div>
+  <div id="main" style="display:none">
+    <div class="profile-box">
+      <img id="userImg" src="" alt="profile">
+      <div class="profile-info">
+        <div class="name" id="userName">-</div>
+        <div class="status">✅ เข้าสู่ระบบแล้ว</div>
+      </div>
+    </div>
+    <div class="time-box">
+      <div class="time" id="clock">00:00:00</div>
+      <div class="date" id="dateDisplay">-</div>
+    </div>
+    <button class="btn btn-checkin" onclick="doCheckIn()">
+      🟢 เช็คอิน (เข้างาน)
+    </button>
+    <button class="btn btn-checkout" onclick="doCheckOut()">
+      🔴 เช็คเอาท์ (ออกงาน)
+    </button>
+    <div class="status-box" id="statusBox"></div>
+  </div>
+</div>
+<script>
+  const LIFF_ID     = "2010532700-aZW3fvZi";
+  const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwM9pvfuITkfzBr6W57YyXcT7rYEB7v5n-pp_5yAoP6qSqpOYgUzBzuOmtu7NWpoavo/exec";
+
+  let userProfile = null;
+
+  function setStep(text, debug) {
+    document.getElementById("loadingText").textContent = text;
+    if (debug) document.getElementById("debugText").textContent = debug;
+  }
+
+  function updateClock() {
+    const now = new Date();
+    document.getElementById("clock").textContent =
+      now.toLocaleTimeString("th-TH", { hour12: false });
+    document.getElementById("dateDisplay").textContent =
+      now.toLocaleDateString("th-TH", {
+        weekday: "long", year: "numeric",
+        month: "long", day: "numeric"
+      });
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  async function initLiff() {
+    try {
+      setStep("⏳ Step 1: กำลัง Init LIFF...", "LIFF ID: " + LIFF_ID);
+      await liff.init({ liffId: LIFF_ID });
+
+      setStep("⏳ Step 2: ตรวจสอบ Login...", "isLoggedIn: " + liff.isLoggedIn());
+      if (!liff.isLoggedIn()) {
+        setStep("🔐 Step 3: กำลัง Redirect ไป Login LINE...");
+        setTimeout(() => liff.login(), 1000);
+        return;
+      }
+
+      setStep("⏳ Step 4: กำลังดึงข้อมูล Profile...");
+      userProfile = await liff.getProfile();
+
+      document.getElementById("userName").textContent = userProfile.displayName;
+      document.getElementById("userImg").src = userProfile.pictureUrl || "";
+      document.getElementById("loading").style.display = "none";
+      document.getElementById("main").style.display = "block";
+
+    } catch (err) {
+      document.getElementById("loading").innerHTML = `
+        <div style="color:#dc2626;font-size:15px;font-weight:600">❌ เกิดข้อผิดพลาด</div>
+        <div class="debug" style="color:#dc2626">${err.message}</div>
+        <div class="debug">LIFF ID: ${LIFF_ID}</div>
+        <button onclick="location.reload()"
+          style="margin-top:16px;padding:10px 20px;background:#06c755;
+          color:white;border:none;border-radius:10px;font-size:14px;font-weight:600">
+          🔄 ลองใหม่
+        </button>`;
+    }
+  }
+
+  async function doCheckIn() {
+    if (!userProfile) return;
+    setLoading(true);
+    try {
+      const res = await fetch(WEB_APP_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          action  : "checkIn",
+          empId   : userProfile.userId,
+          name    : userProfile.displayName,
+          imageUrl: userProfile.pictureUrl
+        })
+      });
+      const data = await res.json();
+      showStatus(data.success, data.message);
+    } catch (err) {
+      showStatus(false, "เกิดข้อผิดพลาด: " + err.message);
+    }
+    setLoading(false);
+  }
+
+  async function doCheckOut() {
+    if (!userProfile) return;
+    setLoading(true);
+    try {
+      const res = await fetch(WEB_APP_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "checkOut",
+          empId : userProfile.userId,
+          name  : userProfile.displayName
+        })
+      });
+      const data = await res.json();
+      showStatus(data.success, data.message);
+    } catch (err) {
+      showStatus(false, "เกิดข้อผิดพลาด: " + err.message);
+    }
+    setLoading(false);
+  }
+
+  function showStatus(success, message) {
+    const box = document.getElementById("statusBox");
+    box.className = "status-box " + (success ? "success" : "error");
+    box.textContent = (success ? "✅ " : "❌ ") + message;
+  }
+
+  function setLoading(loading) {
+    document.querySelectorAll(".btn").forEach(b => b.disabled = loading);
+  }
+
+  initLiff();
+</script>
+</body>
+</html>
